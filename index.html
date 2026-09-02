@@ -232,6 +232,22 @@ function playHurtSound(){
   playTone(170,t+0.07,0.13,'square',sfxGain,0.55);
 }
 
+function playHeartSound(){
+  initAudio();
+  if(actx.state==='suspended') actx.resume();
+  const t=actx.currentTime;
+  playTone(659.25,t,0.08,'square',sfxGain,0.45);
+  playTone(987.77,t+0.06,0.14,'square',sfxGain,0.45);
+}
+
+function playStepSound(){
+  initAudio();
+  if(actx.state==='suspended') actx.resume();
+  const t=actx.currentTime;
+  const freq=95+Math.random()*18;
+  playTone(freq,t,0.045,'square',sfxGain,0.2);
+}
+
 function playGameOverSound(){
   initAudio();
   if(actx.state==='suspended') actx.resume();
@@ -679,6 +695,7 @@ function stepPlayer(){
     if(overlap(p,h)){
       h.col=true;
       score++;
+      playHeartSound();
       burst(h.x+h.w/2,h.y+h.h/2,'#ff1493',14);
       updateHUD();
     }
@@ -729,7 +746,7 @@ function stepPlayer(){
   p.ft++;
   if(!p.og){p.frame=3;}
   else if(Math.abs(p.vx)>0.5){
-    if(p.ft>7){p.frame=(p.frame===1)?2:1;p.ft=0;}
+    if(p.ft>7){p.frame=(p.frame===1)?2:1;p.ft=0;playStepSound();}
   } else {
     p.frame=0;p.ft=0;
   }
