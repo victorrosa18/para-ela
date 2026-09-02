@@ -168,7 +168,7 @@ function playTone(freq,start,dur,type,dest,peak){
 }
 
 // melodia fofa em loop (freq, duração em batidas) — frase A + frase B
-const MELODY=[
+const MELODY_NORMAL=[
   // frase A
   [523.25,1],[659.25,1],[783.99,1],[1046.50,1],
   [783.99,1],[659.25,1],[587.33,1],[698.46,1],
@@ -180,30 +180,64 @@ const MELODY=[
   [587.33,1],[698.46,1],[587.33,1],[493.88,1],
   [440.00,1],[523.25,1],[659.25,1],[698.46,1],
 ];
-const BASS=[
+const BASS_NORMAL=[
   [130.81,4],[196.00,4],[146.83,4],[174.61,4],
   [146.83,4],[220.00,4],[196.00,4],[261.63,4],
 ];
-const BEAT=0.16;
+const BEAT_NORMAL=0.16;
+
+// tema tenso do boss (modo menor, mais rápido)
+const MELODY_BOSS=[
+  [220.00,1],[261.63,1],[293.66,1],[349.23,1],
+  [293.66,1],[261.63,1],[220.00,1],[196.00,1],
+  [220.00,1],[261.63,1],[329.63,1],[392.00,1],
+  [349.23,1],[293.66,1],[261.63,1],[220.00,1],
+  [246.94,1],[293.66,1],[349.23,1],[415.30,1],
+  [349.23,1],[293.66,1],[246.94,1],[220.00,1],
+  [261.63,1],[311.13,1],[392.00,1],[466.16,1],
+  [392.00,1],[349.23,1],[293.66,1],[246.94,1],
+];
+const BASS_BOSS=[
+  [110.00,4],[130.81,4],[98.00,4],[116.54,4],
+  [123.47,4],[146.83,4],[110.00,4],[130.81,4],
+];
+const BEAT_BOSS=0.125;
+
+let musicSet='normal';
+let curMelody=MELODY_NORMAL,curBass=BASS_NORMAL,curBeat=BEAT_NORMAL;
 
 function scheduleLoop(){
   if(!actx) return;
   const startT=actx.currentTime+0.05;
   let t=startT;
-  for(const [freq,beats] of MELODY){
-    const dur=beats*BEAT;
+  for(const [freq,beats] of curMelody){
+    const dur=beats*curBeat;
     playTone(freq,t,dur*0.82,'square',musicGain,0.5);
     t+=dur;
   }
   let tb=startT;
-  for(const [freq,beats] of BASS){
-    const dur=beats*BEAT;
+  for(const [freq,beats] of curBass){
+    const dur=beats*curBeat;
     playTone(freq,tb,dur*0.9,'triangle',musicGain,0.45);
     tb+=dur;
   }
   const loopDur=(t-startT)*1000;
   clearTimeout(musicTimer);
   musicTimer=setTimeout(scheduleLoop,loopDur);
+}
+
+function setMusicPhase(ph){
+  const boss=ph===2;
+  const wantSet=boss?'boss':'normal';
+  if(wantSet===musicSet) return;
+  musicSet=wantSet;
+  curMelody=boss?MELODY_BOSS:MELODY_NORMAL;
+  curBass=boss?BASS_BOSS:BASS_NORMAL;
+  curBeat=boss?BEAT_BOSS:BEAT_NORMAL;
+  if(actx&&musicTimer){
+    clearTimeout(musicTimer);
+    scheduleLoop();
+  }
 }
 
 function startMusic(){
@@ -230,6 +264,38 @@ function playHurtSound(){
   const t=actx.currentTime;
   playTone(320,t,0.09,'square',sfxGain,0.6);
   playTone(170,t+0.07,0.13,'square',sfxGain,0.55);
+}
+
+function playJumpSound(){
+  initAudio();
+  if(actx.state==='suspended') actx.resume();
+  const t=actx.currentTime;
+  const osc=actx.createOscillator();
+  const g=actx.createGain();
+  osc.type='square';
+  osc.frequency.setValueAtTime(220,t);
+  osc.frequency.exponentialRampToValueAtTime(660,t+0.11);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(0.32,t+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+0.13);
+  osc.connect(g);g.connect(sfxGain);
+  osc.start(t);osc.stop(t+0.15);
+}
+
+function playShootSound(){
+  initAudio();
+  if(actx.state==='suspended') actx.resume();
+  const t=actx.currentTime;
+  const osc=actx.createOscillator();
+  const g=actx.createGain();
+  osc.type='square';
+  osc.frequency.setValueAtTime(900,t);
+  osc.frequency.exponentialRampToValueAtTime(280,t+0.09);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(0.28,t+0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+0.1);
+  osc.connect(g);g.connect(sfxGain);
+  osc.start(t);osc.stop(t+0.12);
 }
 
 function playHeartSound(){
@@ -565,6 +631,7 @@ function build(ph){
   // UI
   document.getElementById('cShoot').classList.toggle('visible',ph===2);
   document.getElementById('boss-bar').style.display=ph===2?'flex':'none';
+  setMusicPhase(ph);
   updateHUD();
   updateBossBar();
 }
@@ -658,6 +725,7 @@ function stepPlayer(){
   if(jumpNow&&p.og){
     p.vy=JFORCE;
     p.og=false;
+    playJumpSound();
     burst(p.x+p.w/2,p.y+p.h,'#ffb3d9',6);
   }
 
@@ -667,6 +735,7 @@ function stepPlayer(){
   if(shootNow&&shootCool<=0&&phase===2){
     bullets.push({x:p.x+(p.face>0?p.w:0),y:p.y+14,vx:p.face*18,vy:0,w:9,h:9,dead:false});
     shootCool=8;
+    playShootSound();
     burst(p.x+(p.face>0?p.w+4:-4),p.y+14,'#ffe066',4);
   }
   if(shootCool>0) shootCool--;
